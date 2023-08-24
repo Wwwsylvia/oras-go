@@ -129,6 +129,41 @@ func PackManifest(ctx context.Context, pusher content.Pusher, packManifestVersio
 	}
 }
 
+type PackIndexOptions struct {
+	// Subject is the subject of the index manifest.
+	Subject *ocispec.Descriptor
+
+	// ArtifactType is the artifact type of the index manifest.
+	ArtifactType string
+
+	// Annotations is the annotation map of the index manifest.
+	Annotations map[string]string
+}
+
+func PackIndex(ctx context.Context, pusher content.Pusher, manifests []ocispec.Descriptor, opts PackIndexOptions) (ocispec.Descriptor, error) {
+	if opts.ArtifactType != "" {
+		// TODO: validate format
+	}
+	annotations, err := ensureAnnotationCreated(opts.Annotations, ocispec.AnnotationCreated)
+	if err != nil {
+		return ocispec.Descriptor{}, err
+	}
+	if manifests == nil {
+		// manifests MUST be present but MAY be empty
+		manifests = []ocispec.Descriptor{}
+	}
+	index := ocispec.Index{
+		Versioned: specs.Versioned{
+			SchemaVersion: 2, // historical value. does not pertain to OCI or docker version
+		},
+		MediaType:    ocispec.MediaTypeImageIndex,
+		ArtifactType: opts.ArtifactType,
+		Manifests:    manifests,
+		Annotations:  annotations,
+	}
+	return pushManifest(ctx, pusher, index, index.MediaType, index.ArtifactType, index.Annotations)
+}
+
 // PackOptions contains optional parameters for [Pack].
 //
 // Deprecated: This type is deprecated and not recommended for future use.
