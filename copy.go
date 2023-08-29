@@ -32,6 +32,8 @@ import (
 	"oras.land/oras-go/v2/internal/status"
 	"oras.land/oras-go/v2/internal/syncutil"
 	"oras.land/oras-go/v2/registry"
+	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry/remote/auth"
 )
 
 // defaultConcurrency is the default value of CopyGraphOptions.Concurrency.
@@ -189,6 +191,10 @@ func copyGraph(ctx context.Context, src content.ReadOnlyStorage, dst content.Sto
 	// if FindSuccessors is not provided, use the default one
 	if opts.FindSuccessors == nil {
 		opts.FindSuccessors = content.Successors
+	}
+	// add scope hints
+	if repo, ok := dst.(*remote.Repository); ok {
+		ctx = registryutil.WithScopeHint(ctx, repo.Reference, auth.ActionPull, auth.ActionPush)
 	}
 
 	// traverse the graph
