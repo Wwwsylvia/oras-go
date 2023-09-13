@@ -158,6 +158,7 @@ func PackIndex(ctx context.Context, pusher content.Pusher, manifests []ocispec.D
 		},
 		MediaType:    ocispec.MediaTypeImageIndex,
 		ArtifactType: opts.ArtifactType,
+		Subject:      opts.Subject,
 		Manifests:    manifests,
 		Annotations:  annotations,
 	}
