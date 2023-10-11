@@ -69,6 +69,10 @@ type ManifestStore interface {
 	ReferencePusher
 }
 
+type Namer interface {
+	Name() Reference
+}
+
 // ReferencePusher provides advanced push with the tag service.
 type ReferencePusher interface {
 	// PushReference pushes the manifest with a reference tag.

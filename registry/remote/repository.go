@@ -272,6 +272,10 @@ func (r *Repository) blobStore(desc ocispec.Descriptor) registry.BlobStore {
 	return r.Blobs()
 }
 
+func (r *Repository) Name() registry.Reference {
+	return r.Reference
+}
+
 // Fetch fetches the content identified by the descriptor.
 func (r *Repository) Fetch(ctx context.Context, target ocispec.Descriptor) (io.ReadCloser, error) {
 	return r.blobStore(target).Fetch(ctx, target)
