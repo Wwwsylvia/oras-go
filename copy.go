@@ -101,6 +101,9 @@ type CopyGraphOptions struct {
 	PostCopy func(ctx context.Context, desc ocispec.Descriptor) error
 	// OnCopySkipped will be called when the sub-DAG rooted by the current node
 	// is skipped.
+
+	OnMounted func(ctx context.Context, desc ocispec.Descriptor) error
+
 	OnCopySkipped func(ctx context.Context, desc ocispec.Descriptor) error
 	// FindSuccessors finds the successors of the current node.
 	// fetcher provides cached access to the source storage, and is suitable
@@ -274,6 +277,47 @@ func doCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.St
 		return err
 	}
 	return nil
+}
+
+func mountOrCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.Storage, desc ocispec.Descriptor, opts CopyGraphOptions) error {
+	mounted := tryMount(ctx, src, dst, desc)
+	if !mounted {
+		// fallback to copy if unable to mount
+		return copyNode(ctx, src, dst, desc, opts)
+	}
+
+	if opts.OnMounted != nil {
+		return opts.OnMounted(ctx, desc)
+	}
+	return nil
+}
+
+func tryMount(ctx context.Context, src content.ReadOnlyStorage, dst content.Storage, desc ocispec.Descriptor) bool {
+	if descriptor.IsManifest(desc) {
+		return false
+	}
+
+	srcNamer, ok := src.(registry.Namer)
+	if !ok || srcNamer.Name().Repository == "" {
+		return false
+	}
+	dstNamer, ok := dst.(registry.Namer)
+	if !ok || dstNamer.Name().Repository == "" {
+		return false
+	}
+	if srcNamer.Name().Registry != dstNamer.Name().Registry {
+		return false
+	}
+
+	dstMounter, ok := dst.(registry.Mounter)
+	if !ok {
+		return false
+	}
+	if err := dstMounter.Mount(ctx, desc, srcNamer.Name().Repository, nil); err != nil {
+		return false
+	}
+
+	return true
 }
 
 // copyNode copies a single content from the source CAS to the destination CAS,
