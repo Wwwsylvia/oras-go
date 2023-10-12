@@ -202,3 +202,25 @@ func Example_pushFilesToRemoteRepository() {
 		panic(err)
 	}
 }
+
+// func Example() {
+// 	src, _ := remote.NewRepository("registry.example.com/foo")
+// 	dst, _ := remote.NewRepository("registry.example.com/bar")
+
+// 	opts := oras.CopyGraphOptions{}
+// 	opts.WithCrossMount(src, dst)
+
+// 	oras.CopyGraph(ctx, src, dst, root, opts)
+// }
+
+// func Example2() {
+// 	src := memory.New()
+// 	dst, _ := remote.NewRepository("registry.example.com/bar")
+
+// 	opts := oras.CopyGraphOptions{}
+// 	opts.AttemptMount = func(ctx context.Context, desc v1.Descriptor) (bool, error) {
+// 		return dst.Mount(ctx, desc, "foo", getcon)
+// 	}
+
+// 	oras.CopyGraph(ctx, src, dst, root, opts)
+// }
