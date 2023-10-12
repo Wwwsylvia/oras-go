@@ -32,6 +32,7 @@ import (
 	"oras.land/oras-go/v2/internal/status"
 	"oras.land/oras-go/v2/internal/syncutil"
 	"oras.land/oras-go/v2/registry"
+	"oras.land/oras-go/v2/registry/remote"
 )
 
 // defaultConcurrency is the default value of CopyGraphOptions.Concurrency.
@@ -102,7 +103,8 @@ type CopyGraphOptions struct {
 	// OnCopySkipped will be called when the sub-DAG rooted by the current node
 	// is skipped.
 
-	OnMounted func(ctx context.Context, desc ocispec.Descriptor) error
+	AttemptMount func(ctx context.Context, desc ocispec.Descriptor) (bool, error)
+	OnMounted    func(ctx context.Context, desc ocispec.Descriptor) error
 
 	OnCopySkipped func(ctx context.Context, desc ocispec.Descriptor) error
 	// FindSuccessors finds the successors of the current node.
@@ -112,6 +114,27 @@ type CopyGraphOptions struct {
 	// source storage to fetch large blobs.
 	// If FindSuccessors is nil, content.Successors will be used.
 	FindSuccessors func(ctx context.Context, fetcher content.Fetcher, desc ocispec.Descriptor) ([]ocispec.Descriptor, error)
+}
+
+func (opts *CopyGraphOptions) WithCrossMount(src *remote.Repository, dst *remote.Repository) func(ctx context.Context, desc ocispec.Descriptor) error {
+	return func(ctx context.Context, desc ocispec.Descriptor) error {
+		if src.Reference.Registry != dst.Reference.Registry {
+			return nil
+		}
+
+		if descriptor.IsManifest(desc) {
+			// we do not want to try mounting manifests of any type
+			return nil
+		}
+
+		// Trying mount
+		err := dst.Mount(ctx, desc, src.Reference.Repository, nil)
+		if err != nil {
+			// ignoring mount error
+		}
+		// Mount succeeded
+		return nil
+	}
 }
 
 // Copy copies a rooted directed acyclic graph (DAG) with the tagged root node
@@ -280,7 +303,11 @@ func doCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.St
 }
 
 func mountOrCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.Storage, desc ocispec.Descriptor, opts CopyGraphOptions) error {
-	mounted := tryMount(ctx, src, dst, desc)
+	// mounted := tryMount(ctx, src, dst, desc)
+	mounted, err := opts.AttemptMount(ctx, desc)
+	if err != nil {
+		return err
+	}
 	if !mounted {
 		// fallback to copy if unable to mount
 		return copyNode(ctx, src, dst, desc, opts)
