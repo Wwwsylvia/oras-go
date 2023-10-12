@@ -103,8 +103,10 @@ type CopyGraphOptions struct {
 	// OnCopySkipped will be called when the sub-DAG rooted by the current node
 	// is skipped.
 
+	// AttemptMount returns true if desc is mounted.
 	AttemptMount func(ctx context.Context, desc ocispec.Descriptor) (bool, error)
-	OnMounted    func(ctx context.Context, desc ocispec.Descriptor) error
+	// OnMounted is invoked if desc is mounted.
+	OnMounted func(ctx context.Context, desc ocispec.Descriptor) error
 
 	OnCopySkipped func(ctx context.Context, desc ocispec.Descriptor) error
 	// FindSuccessors finds the successors of the current node.
@@ -116,24 +118,24 @@ type CopyGraphOptions struct {
 	FindSuccessors func(ctx context.Context, fetcher content.Fetcher, desc ocispec.Descriptor) ([]ocispec.Descriptor, error)
 }
 
-func (opts *CopyGraphOptions) WithCrossMount(src *remote.Repository, dst *remote.Repository) func(ctx context.Context, desc ocispec.Descriptor) error {
-	return func(ctx context.Context, desc ocispec.Descriptor) error {
+func (opts *CopyGraphOptions) WithCrossMount(src *remote.Repository, dst *remote.Repository) {
+	opts.AttemptMount = func(ctx context.Context, desc ocispec.Descriptor) (bool, error) {
 		if src.Reference.Registry != dst.Reference.Registry {
-			return nil
+			return false, nil
 		}
 
 		if descriptor.IsManifest(desc) {
 			// we do not want to try mounting manifests of any type
-			return nil
+			return false, nil
 		}
 
 		// Trying mount
 		err := dst.Mount(ctx, desc, src.Reference.Repository, nil)
 		if err != nil {
-			// ignoring mount error
+			return false, err // or ignore the error
 		}
 		// Mount succeeded
-		return nil
+		return true, nil
 	}
 }
 
@@ -303,10 +305,9 @@ func doCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.St
 }
 
 func mountOrCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.Storage, desc ocispec.Descriptor, opts CopyGraphOptions) error {
-	// mounted := tryMount(ctx, src, dst, desc)
-	mounted, err := opts.AttemptMount(ctx, desc)
-	if err != nil {
-		return err
+	var mounted bool
+	if opts.AttemptMount != nil {
+		mounted, _ = opts.AttemptMount(ctx, desc) // ignore mounting error
 	}
 	if !mounted {
 		// fallback to copy if unable to mount
