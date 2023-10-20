@@ -100,14 +100,15 @@ type CopyGraphOptions struct {
 	PreCopy func(ctx context.Context, desc ocispec.Descriptor) error
 	// PostCopy handles the current descriptor after copying it.
 	PostCopy func(ctx context.Context, desc ocispec.Descriptor) error
-	// OnCopySkipped will be called when the sub-DAG rooted by the current node
-	// is skipped.
 
-	// MountOrCopy returns true if desc is mounted.
-	MountOrCopy func(ctx context.Context, desc ocispec.Descriptor) (bool, error)
-	// OnMounted is invoked if desc is mounted.
+	// MountPoint returns the repository name of the mounting source.
+	// If nil, no mounting will be attempted.
+	MountPoint func(ctx context.Context, desc ocispec.Descriptor) (string, error)
+	// OnMounted will be invoked when desc is mounted.
 	OnMounted func(ctx context.Context, desc ocispec.Descriptor) error
 
+	// OnCopySkipped will be called when the sub-DAG rooted by the current node
+	// is skipped.
 	OnCopySkipped func(ctx context.Context, desc ocispec.Descriptor) error
 	// FindSuccessors finds the successors of the current node.
 	// fetcher provides cached access to the source storage, and is suitable
@@ -118,27 +119,39 @@ type CopyGraphOptions struct {
 	FindSuccessors func(ctx context.Context, fetcher content.Fetcher, desc ocispec.Descriptor) ([]ocispec.Descriptor, error)
 }
 
-func (opts *CopyGraphOptions) WithCrossMount(src *remote.Repository, dst *remote.Repository) {
-	opts.MountOrCopy = func(ctx context.Context, desc ocispec.Descriptor) (bool, error) {
-		if descriptor.IsManifest(desc) {
-			// we do not want to try mounting manifests of any type
-			return false, nil
-		}
-		if src.Reference.Registry != dst.Reference.Registry {
-			return false, nil
-		}
+// func Example() {
+// 	src := NewLocalTarget()
+// 	dst := NewRemoteTarget(ref)
+// 	db := LoadLocalMetadataDB()
 
-		// Trying mount
-		var copied bool
-		getContent := func() (io.ReadCloser, error) {
-			copied = true
-			return src.Fetch(ctx, desc)
-		}
-		err := dst.Mount(ctx, desc, src.Reference.Repository, getContent)
-		if err != nil {
-			return false, err
-		}
-		return !copied, nil
+// 	opts := CopyGraphOptions{
+// 		MountPoint: func(ctx context.Context, desc ocispec.Descriptor) (string, error) {
+// 			refs := db.Query(desc)
+// 			refs = refs.Filter(ref.Registry)
+// 			if len(refs) == 0 {
+// 				return "", errdef.ErrNotFound
+// 			}
+// 			return refs[0], nil
+// 		},
+// 	}
+// 	oras.CopyGraph(ctx, src, dst, root, opts)
+// }
+
+// func Example() {
+// 	src := NewRemoteTarget(srcRef)
+// 	dst := NewRemoteTarget(dstRef)
+
+// 	opts := CopyGraphOptions{
+// 		MountPoint: func(ctx context.Context, desc ocispec.Descriptor) (string, error) {
+// 			return srcRef.Repository, nil
+// 		},
+// 	}
+// 	oras.CopyGraph(ctx, src, dst, root, opts)
+// }
+
+func (opts *CopyGraphOptions) MountFrom(src *remote.Repository) {
+	opts.MountPoint = func(ctx context.Context, desc ocispec.Descriptor) (string, error) {
+		return src.Reference.Repository, nil
 	}
 }
 
@@ -308,37 +321,100 @@ func doCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.St
 }
 
 func mountOrCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.Storage, desc ocispec.Descriptor, opts CopyGraphOptions) error {
-	if opts.MountOrCopy == nil {
+	// copy if mount is not applicable
+	if descriptor.IsManifest(desc) {
+		return copyNode(ctx, src, dst, desc, opts)
+	}
+	if opts.MountPoint == nil {
+		return copyNode(ctx, src, dst, desc, opts)
+	}
+	mounter, ok := dst.(registry.Mounter)
+	if !ok {
 		return copyNode(ctx, src, dst, desc, opts)
 	}
 
-	if opts.PreCopy != nil {
-		if err := opts.PreCopy(ctx, desc); err != nil {
-			if err == errSkipDesc {
-				return nil
-			}
-			return err
-		}
-	}
-	mounted, err := opts.MountOrCopy(ctx, desc)
-	if err == nil {
-		if mounted && opts.OnMounted != nil {
-			if opts.OnMounted != nil {
-				return opts.OnMounted(ctx, desc)
-			}
-		}
-	}
+	// try mount
+	fromRepo, err := opts.MountPoint(ctx, desc)
 	if err != nil {
+		return err
+	}
+	var mountFailed bool
+	getContent := func() (io.ReadCloser, error) {
+		if opts.PreCopy != nil {
+			if err := opts.PreCopy(ctx, desc); err != nil {
+				return nil, err
+			}
+		}
+		// the invocation of getContent indicates that mounting is failed
+		mountFailed = true
+		return src.Fetch(ctx, desc)
+	}
+	if err := mounter.Mount(ctx, desc, fromRepo, getContent); err != nil {
+		// ignore mounting error and fallback to copy
 		if err := doCopyNode(ctx, src, dst, desc); err != nil {
 			return err
 		}
 	}
+	if !mountFailed {
+		// successfully mounted
+		if opts.OnMounted != nil {
+			return opts.OnMounted(ctx, desc)
+		}
+		return nil
+	}
 
+	// the node is copied instead of mounted
 	if opts.PostCopy != nil {
 		return opts.PostCopy(ctx, desc)
 	}
 	return nil
 }
+
+// func isMountable(ctx context.Context, dst content.Storage, desc ocispec.Descriptor, opts CopyGraphOptions) bool {
+// 	if descriptor.IsManifest(desc) {
+// 		return false
+// 	}
+// 	if _, ok := dst.(registry.Mounter); !ok {
+// 		return false
+// 	}
+// 	if opts.MountPoint == nil {
+// 		return false
+// 	}
+// 	return true
+// }
+
+// func mountOrCopyNode(ctx context.Context, src content.ReadOnlyStorage, dst content.Storage, desc ocispec.Descriptor, opts CopyGraphOptions) error {
+// 	if opts.MountOrCopy == nil {
+// 		return copyNode(ctx, src, dst, desc, opts)
+// 	}
+
+// 	if opts.PreCopy != nil {
+// 		if err := opts.PreCopy(ctx, desc); err != nil {
+// 			if err == errSkipDesc {
+// 				return nil
+// 			}
+// 			return err
+// 		}
+// 	}
+// 	mounted, err := opts.MountOrCopy(ctx, desc)
+// 	if err == nil {
+// 		if mounted && opts.OnMounted != nil {
+// 			if opts.OnMounted != nil {
+// 				return opts.OnMounted(ctx, desc)
+// 			}
+// 		}
+// 	}
+// 	if err != nil {
+// 		if err := doCopyNode(ctx, src, dst, desc); err != nil {
+// 			return err
+// 		}
+// 	}
+
+// 	if opts.PostCopy != nil {
+// 		return opts.PostCopy(ctx, desc)
+// 	}
+// 	return nil
+// }
 
 // copyNode copies a single content from the source CAS to the destination CAS,
 // and apply the given options.
