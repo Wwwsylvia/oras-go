@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -420,4 +421,15 @@ func TestTarFs_New_Error(t *testing.T) {
 			t.Error("New() error = nil, wantErr = true")
 		}
 	})
+}
+
+func TestCopyFS(t *testing.T) {
+	tfs, err := New("testdata/test.tar")
+	if err != nil {
+		t.Fatalf("New() error = %v, wantErr %v", err, nil)
+	}
+
+	if err := os.CopyFS("copyfs", tfs); err != nil {
+		t.Error(err)
+	}
 }
