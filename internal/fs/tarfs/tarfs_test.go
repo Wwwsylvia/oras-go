@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -266,5 +267,16 @@ func TestTarFS_Stat_Unsupported(t *testing.T) {
 		if want := errdef.ErrUnsupported; !errors.Is(err, want) {
 			t.Errorf("TarFS.Stat(%s) error = %v, wantErr %v", name, err, want)
 		}
+	}
+}
+
+func TestCopyFS(t *testing.T) {
+	tfs, err := New("testdata/test.tar")
+	if err != nil {
+		t.Fatalf("New() error = %v, wantErr %v", err, nil)
+	}
+
+	if err := os.CopyFS("copyfs", tfs); err != nil {
+		t.Error(err)
 	}
 }
