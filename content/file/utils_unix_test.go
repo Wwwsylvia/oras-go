@@ -34,9 +34,9 @@ func Test_extractTarDirectory(t *testing.T) {
 			name: "extract valid files",
 			tarData: createTar(t, []tarEntry{
 				{name: "base/", mode: os.ModeDir},
-				{name: "base/test.txt", content: "hello world"},
-				{name: "base/file_symlink", linkname: "test.txt", mode: os.ModeSymlink},
-				{name: "base/file_hardlink", linkname: "test.txt", isHardLink: true},
+				{name: "base/test.txt", content: "hello world", mode: 0666},
+				{name: "base/file_symlink", linkname: "test.txt", mode: os.ModeSymlink & 0666},
+				{name: "base/file_hardlink", linkname: "test.txt", mode: 0666, isHardLink: true},
 			}),
 			wantFiles: map[string]string{
 				"base/test.txt":      "hello world",
