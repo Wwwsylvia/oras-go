@@ -17,9 +17,12 @@ package credentials
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 
 	"oras.land/oras-go/v2/registry/remote/auth"
+	configPkg "oras.land/oras-go/v2/registry/remote/credentials/internal/config"
 )
 
 // memoryStore is a store that keeps credentials in memory.
@@ -30,6 +33,27 @@ type memoryStore struct {
 // NewMemoryStore creates a new in-memory credentials store.
 func NewMemoryStore() Store {
 	return &memoryStore{}
+}
+
+func LoadMemoryStoreFromConfig(config []byte) (Store, error) {
+	var cfg struct {
+		Auths map[string]configPkg.AuthConfig `json:"auths"`
+	}
+	if err := json.Unmarshal(config, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to decode config: %w", err)
+	}
+
+	s := &memoryStore{}
+	for addr, auth := range cfg.Auths {
+		// normalize the auth key to hostname
+		hostname := configPkg.ToHostname(addr)
+		cred, err := auth.Credential()
+		if err != nil {
+			return nil, err
+		}
+		s.store.Store(hostname, cred)
+	}
+	return s, nil
 }
 
 // Get retrieves credentials from the store for the given server address.

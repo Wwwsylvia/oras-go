@@ -194,7 +194,7 @@ func matchAuth[V any](auths map[string]V, serverAddress string) (V, bool) {
 		return v, true
 	}
 	for addr, v := range auths {
-		if toHostname(addr) == serverAddress {
+		if ToHostname(addr) == serverAddress {
 			return v, true
 		}
 	}
@@ -337,12 +337,12 @@ func decodeAuth(authStr string) (username string, password string, err error) {
 	return username, password, nil
 }
 
-// toHostname normalizes a server address to just its hostname, removing
+// ToHostname normalizes a server address to just its hostname, removing
 // the scheme and the path parts.
 // It is used to match keys in the auths map, which may be either stored as
 // hostname or as hostname including scheme (in legacy docker config files).
 // Reference: https://github.com/docker/cli/blob/v24.0.6/cli/config/credentials/file_store.go#L71
-func toHostname(addr string) string {
+func ToHostname(addr string) string {
 	addr = strings.TrimPrefix(addr, "http://")
 	addr = strings.TrimPrefix(addr, "https://")
 	addr, _, _ = strings.Cut(addr, "/")
