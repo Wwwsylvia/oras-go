@@ -1,16 +1,14 @@
 # Targets in ORAS Go v2
 
-Prerequisite reading: [Modeling Artifact](./Modeling-Artifacts.md)
+**Prerequisite reading:** [Modeling Artifact](./Modeling-Artifacts.md)
 
-In ORAS Go v2, artifacts are modeled as [Directed Acyclic Graphs (DAGs)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) stored in [Content-Addressable Storages (CASs)](https://en.wikipedia.org/wiki/Content-addressable_storage). Each node in the graph represents their [descriptors](https://github.com/opencontainers/image-spec/blob/v1.1.1/descriptor.md).
-
-A descriptor should at least contains the following three required properties:
+In ORAS Go v2, artifacts are modeled as [Directed Acyclic Graphs (DAGs)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) stored in [Content-Addressable Storages (CASs)](https://en.wikipedia.org/wiki/Content-addressable_storage). Each node in the graph represents a [descriptor](https://github.com/opencontainers/image-spec/blob/v1.1.1/descriptor.md) of the content, which should at least contains the following three required properties:
 
 - `mediaType`: the media type of the referenced content
 - `digest`: the digest of the targeted content
 - `size`: the size, in bytes, of the raw content
 
-Here is an example of the descriptor of an image manifest:
+Here is an example of the descriptor of an [OCI Image Manifest](https://github.com/opencontainers/image-spec/blob/v1.1.1/manifest.md):
 
 ```json
 {
@@ -22,17 +20,17 @@ Here is an example of the descriptor of an image manifest:
 
 ## Interfaces
 
-Based on the concepts of graph modeling and descriptors, the following major interfaces are defined in ORAS Go v2.
+Based on the graph-modeling concepts and descriptors, the following major interfaces are defined in ORAS Go v2.
 
 ### Storage
 
-The `Storage` interface represents a content-addressable storage (CAS) where contents are accessed via their descriptors, it provides the following functions:
+The `Storage` interface represents a content-addressable storage (CAS) where content is accessed via descriptors. It provides the following functions:
 
-- `Fetch`: fetches the content identified by the descriptor from the CAS.
-- `Exists`: checks if the described content exists in the CAS or not.
-- `Push`: pushes the content matching the expected descriptor to the CAS.
+- `Fetch`: Fetches the content identified by the descriptor from the CAS.
+- `Exists`: Checks whether the described content exists in the CAS.
+- `Push`: Pushes content matching the expected descriptor to the CAS.
 
-Suppose there is such a graph stored in a `Storage`, where the name of each node is the alias of their descriptors:
+Suppose there is such a graph stored in a `Storage`, where node names are aliases for descriptors:
 
 ```mermaid
 graph TD;
@@ -69,7 +67,7 @@ The `GraphStorage` interface represents a CAS with support of predecessors findi
 - `Fetch`
 - `Exists`
 - `Push`
-- **`Prdecessors`**: finds out the nodes directly pointing to a given node in the graph.
+- **`Prdecessors`**: Finds out the nodes directly pointing to a given node in the graph.
 
 The effects of the `Predecessors` function called against the same graph would be like this:
 
@@ -85,8 +83,8 @@ The `Target` interface represents a CAS with tagging capability. It provides the
 - `Fetch`
 - `Exists`
 - `Push`
-- **`Resolve`**: resolves a tag string to a descriptor.
-- **`Tag`**: tags a descriptor with a tag string.
+- **`Resolve`**: Resolves a tag string to a descriptor.
+- **`Tag`**: Tags a descriptor with a tag string.
 
 Suppose there is such a graph stored in a `Target`, where `m0` is associated with two tags `"foo"` and `"bar"`:
 
@@ -136,26 +134,26 @@ The `GraphTarget` interface represents a CAS with tagging capability and support
 
 ## Content Stores
 
-In ORAS Go v2, a content store is an implementation of `Target`, more specifically, `GraphTarget`.
+In ORAS Go v2, a content store is an implementation of the `Target` interface—more specifically, `GraphTarget`.
 
 There are four built-in content stores defined in the library, they are:
 
 - Memory Store: Stores everything in memory
-- OCI Store: Stores content in format of OCI-Image layout on file system
-- File Store: Stores location-addressable content on file system
-- Repository Store: Represents a remote artifact repository (e.g. `ghcr.io`, `docker.io`, etc.)
+- OCI Store: Stores content in the OCI-Image layout on the file system
+- File Store: Stores location-addressable content on the file system
+- Repository Store: Communicates with remote artifact repositories (e.g. `ghcr.io`, `docker.io`, etc.)
 
 ### Memory Store
 
 The memory store is available at the `content/memory` package, it stores everything in memory where blob content are mapped to their descriptor.
 
-One common scenario for using a memory store is to build and store an artifact in the memory store first, and then later copy it as a whole to other stores, such as remote repositories.
+One common scenario for using a memory store is to build and store an artifact in the memory store first, and then later copy it as a whole to other stores, such as a remote repository.
 
 ### OCI Store
 
-The OCI store is available at the `content/oci` package, it follows the [`OCI image-spec v1.1.1`](https://github.com/opencontainers/image-spec/blob/v1.1.1/image-layout.md) to stores the blob contents on file system.
+The OCI store is available at the `content/oci` package, it follows the [`OCI image-spec v1.1.1`](https://github.com/opencontainers/image-spec/blob/v1.1.1/image-layout.md) to stores blob content on the file system.
 
-Suppose there is an artifact and its signature, it can be represented in the graph below:
+Suppose there is an artifact and its signature, they can be represented in the graph below:
 
 ```mermaid
 graph TD;
@@ -189,10 +187,10 @@ repo/
 
 In the layout,
 
-- All content, no mater of manifests or layer blobs, are all placed in the `blobs` directory, where the path to the content is the digest of the content.
-- `index.json` is an Image Index JSON object, it serves as an entry point of the graph and a tagging system.
-- `ingest` is a tempoprary directory for ingesting the blobs during processing, it not defined in the spec and is ORAS-specific.
-- `oci-layout` is a marker of the base of the OCI Layout.
+- All content, no mater of manifests or layer blobs, are all placed under the `blobs` directory, where the path to the content is the digest of the content.
+- The `index.json` file is an Image Index JSON object, it serves as an entry point of the graph and a tagging system.
+- The `ingest` directory is used temporarily during blob processing, it is not defined in the spec and is ORAS-specific.
+- The `oci-layout` file is a marker of the base of the OCI Layout.
 
 The OCI Layout has several advantages:
 
@@ -268,7 +266,7 @@ A manifest needs to be created to reference the two file blobs and will be store
 ```
 
 In the file store, the blobs described by names are location-addressed
-by file paths. Other contents that are not described by names (usually manifests and config blobs) are stored in a fallback storage. The fallback storage can be any CAS implementing the `Storage` interface, such as OCI Layout storage. But the default fallback storage is a limited memory CAS.
+by file paths. Other contents that are not described by names (typically manifests and config blobs) are stored in a fallback storage. The fallback storage can be any CAS implementing the `Storage` interface, such as OCI Layout storage. The default fallback storage is a limited memory CAS.
 
 For the above example, the graph stored in the file store would be like this:
 
@@ -319,9 +317,9 @@ Here are lists of mappings between major repository functions and registry API e
 | Name | Description | Persistent Storage | Predecessors Support | Scenarios |
 |--|--|--|--|--|
 |Memory Store| Stores everything in memory | No | Yes | Memory caching, testing |
-| OCI Store | Stores content in format of OCI-Image layout on file system | Yes | Yes | Used as a cache/copy of remote repositories |
+| OCI Store | Stores content in format of OCI-Image layout on file system | Yes | Yes | Local cache or copy of remote repositories |
 | File Store | Stores location-addressable content on file system | Partial (For named blobs only) | Yes | Packaging arbitary files |
-| Repository Store | Represents a remote artifact repository (e.g. `ghcr.io`, `docker.io`, etc.) | Yes | Partial (via Referrers API) | Accessing remote repositories |
+| Repository Store |  Communicates with remote artifact repositories (e.g. `ghcr.io`, `docker.io`, etc.) | Yes | Partial (via Referrers API) | Accessing remote repositories |
 
 ### How to choose the appropriate content store
 
