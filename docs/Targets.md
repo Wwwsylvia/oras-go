@@ -1,8 +1,8 @@
 # Targets in ORAS Go v2
 
-Prerequisite reading: [Modeling Artifact](./Artifacts-Model.md)
+Prerequisite reading: [Modeling Artifact](./Modeling-Artifacts.md)
 
-In ORAS Go v2, artifacts are modeled as [Directed Acyclic Graphs (DAGs)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) stored in [Content-Addressable Storages (CASs)](https://en.wikipedia.org/wiki/Content-addressable_storage). Each node in the graph represents their [descriptors](https://github.com/opencontainers/image-spec/blob/v1.1.0/descriptor.md).
+In ORAS Go v2, artifacts are modeled as [Directed Acyclic Graphs (DAGs)](https://en.wikipedia.org/wiki/Directed_acyclic_graph) stored in [Content-Addressable Storages (CASs)](https://en.wikipedia.org/wiki/Content-addressable_storage). Each node in the graph represents their [descriptors](https://github.com/opencontainers/image-spec/blob/v1.1.1/descriptor.md).
 
 A descriptor should at least contains the following three required properties:
 
@@ -22,7 +22,7 @@ Here is an example of the descriptor of an image manifest:
 
 ## Interfaces
 
-Based on the concepts of graph modeling and descriptors, the following mayjor interfaces are defined in ORAS Go v2.
+Based on the concepts of graph modeling and descriptors, the following major interfaces are defined in ORAS Go v2.
 
 ### Storage
 
@@ -153,7 +153,7 @@ One common scenario for using a memory store is to build and store an artifact i
 
 ### OCI Store
 
-The OCI store is available at the `content/oci` package, it follows the [`OCI image-spec v1.1.0`](https://github.com/opencontainers/image-spec/blob/v1.1.0/image-layout.md) to stores the blob contents on file system.
+The OCI store is available at the `content/oci` package, it follows the [`OCI image-spec v1.1.1`](https://github.com/opencontainers/image-spec/blob/v1.1.1/image-layout.md) to stores the blob contents on file system.
 
 Suppose there is an artifact and its signature, it can be represented in the graph below:
 
@@ -196,7 +196,7 @@ In the layout,
 
 The OCI Layout has several advantages:
 
-- It is `OCI image-spec v1.1.0` compliant and is compatible with other tools besides ORAS
+- It is `OCI image-spec v1.1.1` compliant and is compatible with other tools besides ORAS
 - Its clean structure makes it easy to be managed and replicated
 
 Based on these advantages, the OCI Store can be used as a local copy of a remote repository.
@@ -284,7 +284,7 @@ Unlike the OCI store, only named contents are persisted in the file store and al
 
 ### Repository Store
 
-The repository store is available at the `registry/remote` package, it implements APIs defined in the [OCI distribution-spec v1.1.0](https://github.com/opencontainers/distribution-spec/blob/v1.1.0/spec.md) to communicate to the remote repositories.
+The repository store is available at the `registry/remote` package, it implements APIs defined in the [OCI distribution-spec v1.1.1](https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md) to communicate to the remote repositories.
 
 Unlike other content stores mentioned above, the repository store handles manifests and non-manifest blobs seperately. This is because the URI paths for manifests and blobs go through `/v2/<name>/manifests/` and `/v2/<name>/blobs/`, respectively.
 
@@ -292,7 +292,7 @@ The repository store manages manifests via the `ManifestStore` sub-store and han
 
 It is important to note that, the `ManifestStore` implements the `Predecessors` function based on the [Referrers API](https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md#listing-referrers), which only supports referrers finding but not generic predecessors finding.
 
-Here are lists of mappings between mayjor repository functions and registry API endpoints:
+Here are lists of mappings between major repository functions and registry API endpoints:
 
 #### Manifest Store Mappings
 
