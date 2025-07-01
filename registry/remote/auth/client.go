@@ -120,6 +120,8 @@ type Client struct {
 	// - https://distribution.github.io/distribution/spec/auth/jwt/
 	// - https://distribution.github.io/distribution/spec/auth/oauth/
 	ForceAttemptOAuth2 bool
+
+	PreferOAuth2 bool
 }
 
 // client returns an HTTP client used to access the remote registry.
@@ -302,6 +304,17 @@ func (c *Client) fetchBearerToken(ctx context.Context, registry, realm, service 
 	if cred.AccessToken != "" {
 		return cred.AccessToken, nil
 	}
+
+	if c.PreferOAuth2 {
+		// go for oauth2 unless the credential is empty
+		if cred == EmptyCredential {
+			return c.fetchDistributionToken(ctx, realm, service, scopes, cred.Username, cred.Password)
+		}
+		c.fetchOAuth2Token(ctx, realm, service, scopes, cred)
+	}
+
+	// TODO: refactor this for better readability
+	// by default, attempt to fetch distribution token when refresh token is not used
 	if cred == EmptyCredential || (cred.RefreshToken == "" && !c.ForceAttemptOAuth2) {
 		return c.fetchDistributionToken(ctx, realm, service, scopes, cred.Username, cred.Password)
 	}
